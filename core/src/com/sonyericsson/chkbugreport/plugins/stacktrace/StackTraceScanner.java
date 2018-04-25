@@ -42,8 +42,10 @@ import java.util.regex.Pattern;
     }
 
     public Processes scan(BugReportModule br, int id, Section sec, String chapterName) {
-        Pattern pNat = Pattern.compile("  #..  pc (........)  ([^() ]+)(?: \\((.*)\\+(.*)\\))?");
-        Pattern pNatAlt = Pattern.compile("  #..  pc (........)  ([^() ]+) \\(deleted\\)");
+        Pattern pNat = Pattern.compile("  #.. pc (.{8,16})  ([^() ]+)(?: \\((.*)\\+(.*)\\))?");
+        Pattern pNatAlt = Pattern.compile("  #.. pc (.{8,16})  ([^() ]+) \\(deleted\\)");
+        Pattern pNat64 = Pattern.compile("  native: #.. pc (.{8,16})  ([^() ]+)(?: \\((.*)\\+(.*)\\))?");
+        Pattern pNatAlt64 = Pattern.compile("  native: #.. pc (.{8,16})  ([^() ]+) \\(deleted\\)");
         int cnt = sec.getLineCount();
         int state = STATE_INIT;
         Processes processes = new Processes(br, id, chapterName, sec.getName());
@@ -149,6 +151,21 @@ import java.util.regex.Pattern;
                         Matcher m = pNat.matcher(buff);
                         if (!m.matches()) {
                             m = pNatAlt.matcher(buff);
+                        }
+                        if (!m.matches()) {
+                            br.printErr(4, "Cannot parse line: " + buff);
+                            continue;
+                        }
+                        long pc = Long.parseLong(m.group(1), 16);
+                        String fileName = m.group(2);
+                        String method = (m.groupCount() >= 3) ? m.group(3) : null;
+                        int methodOffset = (method == null) ? -1 : Integer.parseInt(m.group(4));
+                        StackTraceItem item = new StackTraceItem(pc, fileName, method, methodOffset);
+                        curStackTrace.addStackTraceItem(item);
+                    } else if (buff.startsWith("  native: ")) {
+                        Matcher m = pNat64.matcher(buff);
+                        if (!m.matches()) {
+                            m = pNatAlt64.matcher(buff);
                         }
                         if (!m.matches()) {
                             br.printErr(4, "Cannot parse line: " + buff);
